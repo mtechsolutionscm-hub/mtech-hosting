@@ -1,0 +1,30 @@
+services:
+  panel:
+    build: .
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://mtech:mtech@db:5432/mtech_hosting?schema=public
+      NEXT_PUBLIC_APP_NAME: MTECH Hosting
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:3000:3000"
+
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: mtech_hosting
+      POSTGRES_USER: mtech
+      POSTGRES_PASSWORD: mtech
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mtech -d mtech_hosting"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  postgres_data:

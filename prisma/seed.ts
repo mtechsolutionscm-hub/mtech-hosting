@@ -1,60 +1,23 @@
 import { PrismaClient, UserRole } from "@prisma/client";
+import { hashPassword } from "../src/lib/password";
 
 const prisma = new PrismaClient();
 
 async function main() {
-  const org = await prisma.organization.upsert({
-    where: { slug: "mtech-demo" },
-    update: {},
-    create: { name: "MTECH Demo Tenant", slug: "mtech-demo" }
-  });
+  const email = (process.env.ADMIN_EMAIL ?? "").trim().toLowerCase();
+  const password = process.env.ADMIN_PASSWORD ?? "";
+  if (!email || !password) {
+    console.log("ADMIN_EMAIL and ADMIN_PASSWORD are not set; no bootstrap admin created.");
+    return;
+  }
 
-  const admin = await prisma.user.upsert({
-    where: { email: "admin@mtech.local" },
-    update: {},
-    create: {
-      email: "admin@mtech.local",
-      name: "MTECH Administrator",
-      passwordHash: "CHANGE_ME",
-      role: UserRole.SUPER_ADMIN
-    }
+  const passwordHash = await hashPassword(password);
+  const user = await prisma.user.upsert({
+    where: { email },
+    update: { passwordHash, role: UserRole.SUPER_ADMIN, isActive: true },
+    create: { email, name: "MTECH Administrator", passwordHash, role: UserRole.SUPER_ADMIN },
   });
-
-  await prisma.membership.upsert({
-    where: { userId_organizationId: { userId: admin.id, organizationId: org.id } },
-    update: {},
-    create: { userId: admin.id, organizationId: org.id }
-  });
-
-  const website = await prisma.website.upsert({
-    where: { organizationId_slug: { organizationId: org.id, slug: "demo-site" } },
-    update: {},
-    create: {
-      organizationId: org.id,
-      name: "Demo Website",
-      slug: "demo-site",
-      status: "ACTIVE"
-    }
-  });
-
-  await prisma.domain.upsert({
-    where: { hostname: "demo.mtech.local" },
-    update: {},
-    create: { websiteId: website.id, hostname: "demo.mtech.local", isPrimary: true }
-  });
-
-  await prisma.application.upsert({
-    where: { id: "demo-application" },
-    update: {},
-    create: {
-      id: "demo-application",
-      websiteId: website.id,
-      name: "Demo Application",
-      image: "nginx:alpine",
-      port: 8080,
-      status: "RUNNING"
-    }
-  });
+  console.log(`Bootstrap administrator ready: ${user.email}`);
 }
 
 main().finally(() => prisma.$disconnect());

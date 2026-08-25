@@ -35,6 +35,48 @@ enum ApplicationStatus {
   FAILED
 }
 
+enum NodeStatus {
+  PROVISIONING
+  READY
+  DRAINING
+  OFFLINE
+  MAINTENANCE
+}
+
+enum DeploymentStatus {
+  QUEUED
+  PROVISIONING
+  DEPLOYING
+  RUNNING
+  STOPPED
+  FAILED
+}
+
+enum DnsRecordType {
+  A
+  AAAA
+  CNAME
+  TXT
+  MX
+  NS
+}
+
+enum DnsRecordStatus {
+  PENDING
+  ACTIVE
+  FAILED
+}
+
+enum CertificateStatus {
+  PENDING
+  ISSUING
+  ACTIVE
+  EXPIRING
+  EXPIRED
+  FAILED
+  REVOKED
+}
+
 model User {
   id           String       @id @default(cuid())
   email        String       @unique
@@ -47,14 +89,14 @@ model User {
 }
 
 model Organization {
-  id          String            @id @default(cuid())
+  id          String             @id @default(cuid())
   name        String
-  slug        String            @unique
+  slug        String             @unique
   status      OrganizationStatus @default(ACTIVE)
   memberships Membership[]
   websites    Website[]
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
 }
 
 model Membership {
@@ -66,6 +108,7 @@ model Membership {
   createdAt      DateTime     @default(now())
 
   @@unique([userId, organizationId])
+  @@index([organizationId])
 }
 
 model Website {
@@ -77,29 +120,127 @@ model Website {
   organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   domains        Domain[]
   applications  Application[]
+  certificates   Certificate[]
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
 
   @@unique([organizationId, slug])
+  @@index([organizationId, status])
 }
 
 model Domain {
-  id        String   @id @default(cuid())
-  websiteId String
-  hostname  String   @unique
-  isPrimary Boolean  @default(false)
-  website   Website  @relation(fields: [websiteId], references: [id], onDelete: Cascade)
-  createdAt DateTime @default(now())
+  id           String       @id @default(cuid())
+  websiteId    String
+  hostname     String       @unique
+  isPrimary    Boolean      @default(false)
+  dnsProvider  String?
+  dnsZoneId    String?
+  verifiedAt   DateTime?
+  website      Website      @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+  records      DnsRecord[]
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  @@index([websiteId])
+}
+
+model DnsRecord {
+  id          String          @id @default(cuid())
+  domainId    String
+  type        DnsRecordType
+  name        String
+  value       String
+  ttl         Int             @default(300)
+  priority    Int?
+  providerId  String?
+  status      DnsRecordStatus @default(PENDING)
+  domain      Domain          @relation(fields: [domainId], references: [id], onDelete: Cascade)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@index([domainId, type])
 }
 
 model Application {
-  id        String            @id @default(cuid())
-  websiteId String
-  name      String
-  image     String
-  port      Int               @default(3000)
-  status    ApplicationStatus @default(CREATED)
-  website   Website           @relation(fields: [websiteId], references: [id], onDelete: Cascade)
-  createdAt DateTime          @default(now())
-  updatedAt DateTime          @updatedAt
+  id             String            @id @default(cuid())
+  websiteId      String
+  name           String
+  image          String
+  port           Int               @default(3000)
+  status         ApplicationStatus @default(CREATED)
+  website        Website           @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+  nodeId         String?
+  node           HostingNode?      @relation(fields: [nodeId], references: [id], onDelete: SetNull)
+  deployments    Deployment[]
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  @@index([websiteId, status])
+  @@index([nodeId])
+}
+
+model HostingNode {
+  id           String        @id @default(cuid())
+  name         String        @unique
+  provider     String
+  region       String
+  endpoint     String
+  status       NodeStatus    @default(PROVISIONING)
+  capacity     Int           @default(1)
+  applications Application[]
+  deployments  Deployment[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@index([provider, region, status])
+}
+
+model Deployment {
+  id            String           @id @default(cuid())
+  applicationId String
+  nodeId        String?
+  image         String
+  status        DeploymentStatus @default(QUEUED)
+  desiredState  String           @default("RUNNING")
+  containerId   String?
+  errorMessage  String?
+  startedAt     DateTime?
+  finishedAt    DateTime?
+  application   Application      @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  node          HostingNode?     @relation(fields: [nodeId], references: [id], onDelete: SetNull)
+  events        DeploymentEvent[]
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  @@index([applicationId, status])
+  @@index([nodeId, status])
+}
+
+model DeploymentEvent {
+  id           String     @id @default(cuid())
+  deploymentId String
+  type         String
+  message      String
+  metadata     Json?
+  deployment   Deployment @relation(fields: [deploymentId], references: [id], onDelete: Cascade)
+  createdAt    DateTime   @default(now())
+
+  @@index([deploymentId, createdAt])
+}
+
+model Certificate {
+  id          String            @id @default(cuid())
+  websiteId   String
+  hostname    String
+  provider    String            @default("letsencrypt")
+  status      CertificateStatus @default(PENDING)
+  expiresAt   DateTime?
+  issuedAt    DateTime?
+  lastError   String?
+  website     Website           @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  @@unique([websiteId, hostname])
+  @@index([status, expiresAt])
 }

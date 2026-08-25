@@ -7,175 +7,28 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum UserRole {
-  SUPER_ADMIN
-  ADMIN
-  SUPPORT
-  CUSTOMER_OWNER
-  CUSTOMER_MEMBER
-}
-
+enum UserRole { SUPER_ADMIN ADMIN SUPPORT CUSTOMER_OWNER CUSTOMER_MEMBER }
 enum OrganizationStatus { ACTIVE SUSPENDED }
 enum WebsiteStatus { PENDING ACTIVE SUSPENDED DELETED }
 enum ApplicationStatus { CREATED DEPLOYING RUNNING STOPPED FAILED }
 enum DeploymentStatus { QUEUED BUILDING DEPLOYING RUNNING FAILED STOPPED }
 enum DNSRecordType { A AAAA CNAME TXT MX NS }
 enum CertificateStatus { PENDING ISSUED RENEWING EXPIRED REVOKED FAILED }
+enum SubscriptionStatus { TRIALING ACTIVE PAST_DUE CANCELED EXPIRED }
+enum InvoiceStatus { DRAFT OPEN PAID VOID UNCOLLECTIBLE }
 
-model User {
-  id           String       @id @default(cuid())
-  email        String       @unique
-  name         String?
-  passwordHash String
-  role         UserRole     @default(CUSTOMER_OWNER)
-  isActive     Boolean      @default(true)
-  memberships  Membership[]
-  sessions     Session[]
-  auditLogs    AuditLog[]
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
-}
-
-model Session {
-  id        String   @id @default(cuid())
-  tokenHash String   @unique
-  userId    String
-  expiresAt DateTime
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt DateTime @default(now())
-  @@index([userId])
-  @@index([expiresAt])
-}
-
-model Organization {
-  id          String             @id @default(cuid())
-  name        String
-  slug        String             @unique
-  status      OrganizationStatus @default(ACTIVE)
-  memberships Membership[]
-  websites    Website[]
-  createdAt   DateTime           @default(now())
-  updatedAt   DateTime           @updatedAt
-}
-
-model Membership {
-  id             String       @id @default(cuid())
-  userId         String
-  organizationId String
-  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  createdAt      DateTime     @default(now())
-  @@unique([userId, organizationId])
-  @@index([organizationId])
-}
-
-model Website {
-  id             String          @id @default(cuid())
-  organizationId String
-  name           String
-  slug           String
-  status         WebsiteStatus   @default(PENDING)
-  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  domains        Domain[]
-  applications  Application[]
-  deployments    Deployment[]
-  certificates   Certificate[]
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
-  @@unique([organizationId, slug])
-  @@index([organizationId])
-}
-
-model Domain {
-  id            String          @id @default(cuid())
-  websiteId     String
-  hostname      String          @unique
-  isPrimary     Boolean         @default(false)
-  verificationToken String?
-  verifiedAt    DateTime?
-  website       Website         @relation(fields: [websiteId], references: [id], onDelete: Cascade)
-  dnsRecords    DNSRecord[]
-  certificates  Certificate[]
-  createdAt     DateTime        @default(now())
-  @@index([websiteId])
-}
-
-model DNSRecord {
-  id        String        @id @default(cuid())
-  domainId  String
-  type      DNSRecordType
-  name      String
-  value     String
-  ttl       Int           @default(3600)
-  priority  Int?
-  domain    Domain        @relation(fields: [domainId], references: [id], onDelete: Cascade)
-  createdAt DateTime      @default(now())
-  updatedAt DateTime      @updatedAt
-  @@index([domainId, type])
-}
-
-model Application {
-  id          String            @id @default(cuid())
-  websiteId   String
-  name        String
-  image       String
-  port        Int               @default(3000)
-  status      ApplicationStatus @default(CREATED)
-  website     Website           @relation(fields: [websiteId], references: [id], onDelete: Cascade)
-  deployments Deployment[]
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
-  @@index([websiteId])
-}
-
-model Deployment {
-  id            String           @id @default(cuid())
-  applicationId String
-  websiteId     String
-  image         String
-  status        DeploymentStatus @default(QUEUED)
-  containerId   String?
-  errorMessage  String?
-  startedAt     DateTime?
-  finishedAt    DateTime?
-  application   Application      @relation(fields: [applicationId], references: [id], onDelete: Cascade)
-  website       Website          @relation(fields: [websiteId], references: [id], onDelete: Cascade)
-  createdAt     DateTime         @default(now())
-  updatedAt     DateTime         @updatedAt
-  @@index([applicationId, createdAt])
-  @@index([websiteId, createdAt])
-}
-
-model Certificate {
-  id         String            @id @default(cuid())
-  websiteId  String
-  domainId   String
-  status     CertificateStatus @default(PENDING)
-  provider   String            @default("letsencrypt")
-  certificateArn String?
-  issuedAt   DateTime?
-  expiresAt  DateTime?
-  lastError  String?
-  website    Website           @relation(fields: [websiteId], references: [id], onDelete: Cascade)
-  domain     Domain            @relation(fields: [domainId], references: [id], onDelete: Cascade)
-  createdAt  DateTime          @default(now())
-  updatedAt  DateTime          @updatedAt
-  @@index([websiteId])
-  @@index([domainId])
-  @@index([status, expiresAt])
-}
-
-model AuditLog {
-  id         String   @id @default(cuid())
-  userId     String?
-  action     String
-  resource   String
-  resourceId String?
-  metadata   Json?
-  ipAddress  String?
-  userAgent  String?
-  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
-  createdAt  DateTime @default(now())
-  @@index([userId, createdAt])
-  @@index([resource, resourceId])
-}
+model User { id String @id @default(cuid()) email String @unique name String? passwordHash String role UserRole @default(CUSTOMER_OWNER) isActive Boolean @default(true) memberships Membership[] sessions Session[] auditLogs AuditLog[] createdAt DateTime @default(now()) updatedAt DateTime @updatedAt }
+model Session { id String @id @default(cuid()) tokenHash String @unique userId String expiresAt DateTime user User @relation(fields: [userId], references: [id], onDelete: Cascade) createdAt DateTime @default(now()) @@index([userId]) @@index([expiresAt]) }
+model Organization { id String @id @default(cuid()) name String slug String @unique status OrganizationStatus @default(ACTIVE) memberships Membership[] websites Website[] subscriptions Subscription[] invoices Invoice[] usageRecords UsageRecord[] createdAt DateTime @default(now()) updatedAt DateTime @updatedAt }
+model Membership { id String @id @default(cuid()) userId String organizationId String user User @relation(fields: [userId], references: [id], onDelete: Cascade) organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade) createdAt DateTime @default(now()) @@unique([userId, organizationId]) @@index([organizationId]) }
+model Website { id String @id @default(cuid()) organizationId String name String slug String status WebsiteStatus @default(PENDING) organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade) domains Domain[] applications Application[] deployments Deployment[] certificates Certificate[] createdAt DateTime @default(now()) updatedAt DateTime @updatedAt @@unique([organizationId, slug]) @@index([organizationId]) }
+model Domain { id String @id @default(cuid()) websiteId String hostname String @unique isPrimary Boolean @default(false) verificationToken String? verifiedAt DateTime? website Website @relation(fields: [websiteId], references: [id], onDelete: Cascade) dnsRecords DNSRecord[] certificates Certificate[] createdAt DateTime @default(now()) @@index([websiteId]) }
+model DNSRecord { id String @id @default(cuid()) domainId String type DNSRecordType name String value String ttl Int @default(3600) priority Int? domain Domain @relation(fields: [domainId], references: [id], onDelete: Cascade) createdAt DateTime @default(now()) updatedAt DateTime @updatedAt @@index([domainId, type]) }
+model Application { id String @id @default(cuid()) websiteId String name String image String port Int @default(3000) status ApplicationStatus @default(CREATED) website Website @relation(fields: [websiteId], references: [id], onDelete: Cascade) deployments Deployment[] createdAt DateTime @default(now()) updatedAt DateTime @updatedAt @@index([websiteId]) }
+model Deployment { id String @id @default(cuid()) applicationId String websiteId String image String status DeploymentStatus @default(QUEUED) containerId String? errorMessage String? startedAt DateTime? finishedAt DateTime? application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade) website Website @relation(fields: [websiteId], references: [id], onDelete: Cascade) createdAt DateTime @default(now()) updatedAt DateTime @updatedAt @@index([applicationId, createdAt]) @@index([websiteId, createdAt]) }
+model Certificate { id String @id @default(cuid()) websiteId String domainId String status CertificateStatus @default(PENDING) provider String @default("letsencrypt") certificateArn String? issuedAt DateTime? expiresAt DateTime? lastError String? website Website @relation(fields: [websiteId], references: [id], onDelete: Cascade) domain Domain @relation(fields: [domainId], references: [id], onDelete: Cascade) createdAt DateTime @default(now()) updatedAt DateTime @updatedAt @@index([websiteId]) @@index([domainId]) @@index([status, expiresAt]) }
+model Plan { id String @id @default(cuid()) name String @unique slug String @unique description String? monthlyPriceCents Int yearlyPriceCents Int maxWebsites Int maxDomains Int maxApplications Int maxStorageMb Int maxBandwidthGb Int isPublic Boolean @default(true) subscriptions Subscription[] createdAt DateTime @default(now()) updatedAt DateTime @updatedAt }
+model Subscription { id String @id @default(cuid()) organizationId String planId String status SubscriptionStatus @default(TRIALING) currentPeriodStart DateTime currentPeriodEnd DateTime cancelAtPeriodEnd Boolean @default(false) externalCustomerId String? externalSubscriptionId String? @unique organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade) plan Plan @relation(fields: [planId], references: [id]) invoices Invoice[] createdAt DateTime @default(now()) updatedAt DateTime @updatedAt @@index([organizationId, status]) }
+model Invoice { id String @id @default(cuid()) organizationId String subscriptionId String? number String @unique status InvoiceStatus @default(DRAFT) currency String @default("XAF") subtotalCents Int taxCents Int @default(0) totalCents Int dueAt DateTime? paidAt DateTime? externalInvoiceId String? organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade) subscription Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull) createdAt DateTime @default(now()) updatedAt DateTime @updatedAt @@index([organizationId, createdAt]) @@index([status, dueAt]) }
+model UsageRecord { id String @id @default(cuid()) organizationId String periodStart DateTime periodEnd DateTime websites Int @default(0) domains Int @default(0) applications Int @default(0) storageMb Int @default(0) bandwidthGb Int @default(0) organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade) createdAt DateTime @default(now()) @@unique([organizationId, periodStart, periodEnd]) }
+model AuditLog { id String @id @default(cuid()) userId String? action String resource String resourceId String? metadata Json? ipAddress String? userAgent String? user User? @relation(fields: [userId], references: [id], onDelete: SetNull) createdAt DateTime @default(now()) @@index([userId, createdAt]) @@index([resource, resourceId]) }

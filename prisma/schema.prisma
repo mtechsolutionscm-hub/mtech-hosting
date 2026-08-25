@@ -41,20 +41,35 @@ model User {
   name         String?
   passwordHash String
   role         UserRole     @default(CUSTOMER_OWNER)
+  isActive     Boolean      @default(true)
   memberships  Membership[]
+  sessions     Session[]
+  auditLogs    AuditLog[]
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
 }
 
+model Session {
+  id        String   @id @default(cuid())
+  tokenHash String   @unique
+  userId    String
+  expiresAt DateTime
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
 model Organization {
-  id          String            @id @default(cuid())
+  id          String             @id @default(cuid())
   name        String
-  slug        String            @unique
+  slug        String             @unique
   status      OrganizationStatus @default(ACTIVE)
   memberships Membership[]
   websites    Website[]
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
 }
 
 model Membership {
@@ -66,6 +81,7 @@ model Membership {
   createdAt      DateTime     @default(now())
 
   @@unique([userId, organizationId])
+  @@index([organizationId])
 }
 
 model Website {
@@ -81,6 +97,7 @@ model Website {
   updatedAt      DateTime        @updatedAt
 
   @@unique([organizationId, slug])
+  @@index([organizationId])
 }
 
 model Domain {
@@ -90,6 +107,8 @@ model Domain {
   isPrimary Boolean  @default(false)
   website   Website  @relation(fields: [websiteId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
+
+  @@index([websiteId])
 }
 
 model Application {
@@ -102,4 +121,22 @@ model Application {
   website   Website           @relation(fields: [websiteId], references: [id], onDelete: Cascade)
   createdAt DateTime          @default(now())
   updatedAt DateTime          @updatedAt
+
+  @@index([websiteId])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  action    String
+  resource  String
+  resourceId String?
+  metadata  Json?
+  ipAddress String?
+  userAgent String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([resource, resourceId])
 }

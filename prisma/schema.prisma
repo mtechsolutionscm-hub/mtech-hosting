@@ -35,6 +35,20 @@ enum ApplicationStatus {
   FAILED
 }
 
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  LOGIN
+  LOGOUT
+  PROVISION
+  DEPLOY
+  SUSPEND
+  RESTORE
+  BILLING
+  SECURITY
+}
+
 model User {
   id           String       @id @default(cuid())
   email        String       @unique
@@ -42,19 +56,23 @@ model User {
   passwordHash String
   role         UserRole     @default(CUSTOMER_OWNER)
   memberships  Membership[]
+  auditLogs    AuditLog[]
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
 }
 
 model Organization {
-  id          String            @id @default(cuid())
+  id          String             @id @default(cuid())
   name        String
-  slug        String            @unique
+  slug        String             @unique
   status      OrganizationStatus @default(ACTIVE)
+  planId      String?
+  plan        HostingPlan?       @relation(fields: [planId], references: [id], onDelete: SetNull)
   memberships Membership[]
   websites    Website[]
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
+  auditLogs   AuditLog[]
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
 }
 
 model Membership {
@@ -102,4 +120,42 @@ model Application {
   website   Website           @relation(fields: [websiteId], references: [id], onDelete: Cascade)
   createdAt DateTime          @default(now())
   updatedAt DateTime          @updatedAt
+}
+
+model HostingPlan {
+  id             String         @id @default(cuid())
+  name           String         @unique
+  slug           String         @unique
+  description    String?
+  monthlyPrice   Int            @default(0)
+  annualPrice    Int            @default(0)
+  storageGb      Int            @default(10)
+  bandwidthGb    Int            @default(100)
+  websitesLimit  Int            @default(1)
+  domainsLimit   Int            @default(5)
+  applicationsLimit Int         @default(1)
+  active         Boolean        @default(true)
+  organizations  Organization[]
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+}
+
+model AuditLog {
+  id             String           @id @default(cuid())
+  action         AuditAction
+  actorUserId    String?
+  organizationId String?
+  resourceType   String
+  resourceId     String?
+  message        String?
+  metadata       Json?
+  ipAddress      String?
+  userAgent      String?
+  actor          User?            @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+  organization   Organization?    @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  createdAt      DateTime         @default(now())
+
+  @@index([organizationId, createdAt])
+  @@index([actorUserId, createdAt])
+  @@index([resourceType, resourceId])
 }

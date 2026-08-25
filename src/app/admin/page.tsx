@@ -1,11 +1,13 @@
 import { redirect } from "next/navigation";
-import { requireRole } from "@/lib/auth";
+import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
 export default async function Admin() {
-  const user = await requireRole(["SUPER_ADMIN", "ADMIN", "SUPPORT"]);
+  const user = await getCurrentUser();
+  if (!user) redirect("/login");
+  if (!["SUPER_ADMIN", "ADMIN", "SUPPORT"].includes(user.role)) redirect("/dashboard");
   const [orgs, users, websites, domains, apps, recentLogs] = await Promise.all([
     prisma.organization.count(), prisma.user.count(), prisma.website.count(), prisma.domain.count(), prisma.application.count(),
     prisma.auditLog.findMany({ orderBy: { createdAt: "desc" }, take: 8, include: { user: { select: { email: true } } } }),

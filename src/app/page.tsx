@@ -1,23 +1,6 @@
-export default function Home() {
-  return (
-    <main className="container">
-      <div className="header">
-        <div>
-          <h1>MTECH Hosting</h1>
-          <p className="muted">Multi-tenant hosting control plane</p>
-        </div>
-        <span className="badge">MVP ONLINE</span>
-      </div>
-      <div className="grid">
-        <a className="card" href="/dashboard">
-          <h2>Customer Dashboard</h2>
-          <p className="muted">Websites, applications, domains and usage.</p>
-        </a>
-        <a className="card" href="/admin">
-          <h2>Admin Dashboard</h2>
-          <p className="muted">Tenants, websites, applications and infrastructure.</p>
-        </a>
-      </div>
-    </main>
-  );
+import { getCurrentUser } from "@/lib/auth";
+
+export default async function Home() {
+  const user = await getCurrentUser();
+  return <main className="container"><nav className="header"><div className="eyebrow">MTECH HOSTING</div><div className="nav">{user ? <a href="/dashboard">Open dashboard</a> : <><a href="/login">Sign in</a><a className="primary" href="/register">Start hosting</a></>}</div></nav><section style={{padding:"70px 0 80px",maxWidth:900}}><span className="badge">GLOBAL HOSTING CONTROL PLANE</span><h1 style={{fontSize:"clamp(48px,8vw,88px)",lineHeight:.98,marginTop:20}}>Host. Deploy. Scale.</h1><p className="muted" style={{fontSize:20,lineHeight:1.6,maxWidth:720}}>A multi-tenant platform for websites, domains and containerized applications. Built for agencies, businesses and modern development teams.</p><div className="nav" style={{marginTop:28}}>{user ? <a className="primary" href="/dashboard">Go to workspace</a> : <><a className="primary" href="/register">Create your workspace</a><a href="/login">Sign in to console</a></>}</div></section><div className="grid"><article className="card"><div className="eyebrow">01 · MULTI-TENANT</div><h2>Isolated workspaces</h2><p className="muted">Organizations, memberships and resources are scoped from the API layer upward.</p></article><article className="card"><div className="eyebrow">02 · APPLICATIONS</div><h2>Container-ready</h2><p className="muted">Prepare applications for Docker-based deployment, health checks and lifecycle automation.</p></article><article className="card"><div className="eyebrow">03 · DOMAINS</div><h2>Domain-first hosting</h2><p className="muted">Manage domains today, with DNS, SSL, routing and automated provisioning coming on the infrastructure layer.</p></article></div></main>;
 }

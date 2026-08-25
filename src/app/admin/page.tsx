@@ -1,31 +1,17 @@
-import { PrismaClient } from "@prisma/client";
+import { redirect } from "next/navigation";
+import { getCurrentUser } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 
-const prisma = new PrismaClient();
+export const dynamic = "force-dynamic";
 
 export default async function Admin() {
-  const [orgs, users, websites, apps] = await Promise.all([
-    prisma.organization.count(),
-    prisma.user.count(),
-    prisma.website.count(),
-    prisma.application.count(),
+  const user = await getCurrentUser();
+  if (!user) redirect("/login");
+  if (!["SUPER_ADMIN", "ADMIN", "SUPPORT"].includes(user.role)) redirect("/dashboard");
+  const [orgs, users, websites, domains, apps, recentLogs] = await Promise.all([
+    prisma.organization.count(), prisma.user.count(), prisma.website.count(), prisma.domain.count(), prisma.application.count(),
+    prisma.auditLog.findMany({ orderBy: { createdAt: "desc" }, take: 8, include: { user: { select: { email: true } } } }),
   ]);
 
-  return (
-    <main className="container">
-      <div className="header">
-        <div><h1>Admin Dashboard</h1><p className="muted">MTECH platform administration</p></div>
-        <a href="/">Home</a>
-      </div>
-      <div className="grid">
-        <div className="card"><h3>Customers/Tenants</h3><strong>{orgs}</strong></div>
-        <div className="card"><h3>Users</h3><strong>{users}</strong></div>
-        <div className="card"><h3>Websites</h3><strong>{websites}</strong></div>
-        <div className="card"><h3>Applications</h3><strong>{apps}</strong></div>
-      </div>
-      <section className="card" style={{marginTop:18}}>
-        <h2>Next</h2>
-        <p className="muted">Provisioning, domain/DNS management, Docker lifecycle, SSL and billing will be added in subsequent batches.</p>
-      </section>
-    </main>
-  );
+  return <main className="container"><div className="header"><div><div className="eyebrow">MTECH CONTROL PLANE</div><h1>Administration</h1><p className="muted">Signed in as {user.email} · {user.role}</p></div><div className="nav"><a href="/">Home</a><a href="/dashboard">Customer view</a></div></div><div className="grid"><div className="card"><span className="muted">Tenants</span><strong className="metric">{orgs}</strong></div><div className="card"><span className="muted">Users</span><strong className="metric">{users}</strong></div><div className="card"><span className="muted">Websites</span><strong className="metric">{websites}</strong></div><div className="card"><span className="muted">Domains</span><strong className="metric">{domains}</strong></div><div className="card"><span className="muted">Applications</span><strong className="metric">{apps}</strong></div></div><section className="section-head"><div><h2>Recent activity</h2><p className="muted">Security and operational events.</p></div></section><div className="stack">{recentLogs.map(log => <article className="card" key={log.id}><div className="row"><div><strong>{log.action}</strong><p className="muted">{log.resource}{log.resourceId ? ` · ${log.resourceId}` : ""}</p></div><span className="muted small">{log.user?.email ?? "system"}</span></div></article>)}{recentLogs.length === 0 && <div className="card"><p className="muted">No activity recorded yet.</p></div>}</div></main>;
 }

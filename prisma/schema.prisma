@@ -15,25 +15,12 @@ enum UserRole {
   CUSTOMER_MEMBER
 }
 
-enum OrganizationStatus {
-  ACTIVE
-  SUSPENDED
-}
-
-enum WebsiteStatus {
-  PENDING
-  ACTIVE
-  SUSPENDED
-  DELETED
-}
-
-enum ApplicationStatus {
-  CREATED
-  DEPLOYING
-  RUNNING
-  STOPPED
-  FAILED
-}
+enum OrganizationStatus { ACTIVE SUSPENDED }
+enum WebsiteStatus { PENDING ACTIVE SUSPENDED DELETED }
+enum ApplicationStatus { CREATED DEPLOYING RUNNING STOPPED FAILED }
+enum DeploymentStatus { QUEUED BUILDING DEPLOYING RUNNING FAILED STOPPED }
+enum DNSRecordType { A AAAA CNAME TXT MX NS }
+enum CertificateStatus { PENDING ISSUED RENEWING EXPIRED REVOKED FAILED }
 
 model User {
   id           String       @id @default(cuid())
@@ -56,7 +43,6 @@ model Session {
   expiresAt DateTime
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
-
   @@index([userId])
   @@index([expiresAt])
 }
@@ -79,7 +65,6 @@ model Membership {
   user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   createdAt      DateTime     @default(now())
-
   @@unique([userId, organizationId])
   @@index([organizationId])
 }
@@ -93,50 +78,104 @@ model Website {
   organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   domains        Domain[]
   applications  Application[]
+  deployments    Deployment[]
+  certificates   Certificate[]
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
-
   @@unique([organizationId, slug])
   @@index([organizationId])
 }
 
 model Domain {
-  id        String   @id @default(cuid())
-  websiteId String
-  hostname  String   @unique
-  isPrimary Boolean  @default(false)
-  website   Website  @relation(fields: [websiteId], references: [id], onDelete: Cascade)
-  createdAt DateTime @default(now())
-
+  id            String          @id @default(cuid())
+  websiteId     String
+  hostname      String          @unique
+  isPrimary     Boolean         @default(false)
+  verificationToken String?
+  verifiedAt    DateTime?
+  website       Website         @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+  dnsRecords    DNSRecord[]
+  certificates  Certificate[]
+  createdAt     DateTime        @default(now())
   @@index([websiteId])
+}
+
+model DNSRecord {
+  id        String        @id @default(cuid())
+  domainId  String
+  type      DNSRecordType
+  name      String
+  value     String
+  ttl       Int           @default(3600)
+  priority  Int?
+  domain    Domain        @relation(fields: [domainId], references: [id], onDelete: Cascade)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  @@index([domainId, type])
 }
 
 model Application {
-  id        String            @id @default(cuid())
-  websiteId String
-  name      String
-  image     String
-  port      Int               @default(3000)
-  status    ApplicationStatus @default(CREATED)
-  website   Website           @relation(fields: [websiteId], references: [id], onDelete: Cascade)
-  createdAt DateTime          @default(now())
-  updatedAt DateTime          @updatedAt
-
+  id          String            @id @default(cuid())
+  websiteId   String
+  name        String
+  image       String
+  port        Int               @default(3000)
+  status      ApplicationStatus @default(CREATED)
+  website     Website           @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+  deployments Deployment[]
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
   @@index([websiteId])
 }
 
-model AuditLog {
-  id        String   @id @default(cuid())
-  userId    String?
-  action    String
-  resource  String
-  resourceId String?
-  metadata  Json?
-  ipAddress String?
-  userAgent String?
-  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
-  createdAt DateTime @default(now())
+model Deployment {
+  id            String           @id @default(cuid())
+  applicationId String
+  websiteId     String
+  image         String
+  status        DeploymentStatus @default(QUEUED)
+  containerId   String?
+  errorMessage  String?
+  startedAt     DateTime?
+  finishedAt    DateTime?
+  application   Application      @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  website       Website          @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  @@index([applicationId, createdAt])
+  @@index([websiteId, createdAt])
+}
 
+model Certificate {
+  id         String            @id @default(cuid())
+  websiteId  String
+  domainId   String
+  status     CertificateStatus @default(PENDING)
+  provider   String            @default("letsencrypt")
+  certificateArn String?
+  issuedAt   DateTime?
+  expiresAt  DateTime?
+  lastError  String?
+  website    Website           @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+  domain     Domain            @relation(fields: [domainId], references: [id], onDelete: Cascade)
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+  @@index([websiteId])
+  @@index([domainId])
+  @@index([status, expiresAt])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  action     String
+  resource   String
+  resourceId String?
+  metadata   Json?
+  ipAddress  String?
+  userAgent  String?
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  createdAt  DateTime @default(now())
   @@index([userId, createdAt])
   @@index([resource, resourceId])
 }
